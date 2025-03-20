@@ -1,0 +1,27 @@
+<svg width="400" height="150" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect x="5" y="4" width="135" height="120" rx="20" ry="20" fill="#4A90E2" stroke="#ffffff" stroke-width="4"/>
+
+  <!-- Person (Coach) Icon -->
+  <circle cx="60" cy="55" r="15" fill="#ffffff"/> <!-- Head -->
+  <path d="M60 70 L60 110 L40 130" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round"/> <!-- Body & Arm -->
+  <path d="M60 110 L80 130" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round"/> <!-- Other Arm -->
+
+  <!-- Person (Student) Icon -->
+  <circle cx="120" cy="70" r="12" fill="#ffffff"/> <!-- Head -->
+  <path d="M120 80 L120 120 L101 130" stroke="#ffffff" stroke-width="4" fill="none" stroke-linecap="round"/> <!-- Body & Arm -->
+  <path d="M120 120 L140 130" stroke="#ffffff" stroke-width="4" fill="none" stroke-linecap="round"/> <!-- Other Arm -->
+
+  <!-- Light Bulb (Knowledge) -->
+  <circle cx="90" cy="50" r="12" fill="yellow" stroke="#ffffff" stroke-width="3"/>
+  <line x1="90" y1="62" x2="90" y2="72" stroke="#ffffff" stroke-width="3"/>
+  <line x1="82" y1="75" x2="98" y2="75" stroke="#ffffff" stroke-width="3"/>
+
+  <!-- Rays of Knowledge -->
+  <line x1="90" y1="30" x2="90" y2="20" stroke="yellow" stroke-width="3"/>
+  <line x1="105" y1="35" x2="115" y2="25" stroke="yellow" stroke-width="3"/>
+  <line x1="75" y1="35" x2="65" y2="25" stroke="yellow" stroke-width="3"/>
+
+  <!-- Coaching Text on Right -->
+  <text x="140" y="85" font-size="38" fill="#4A90E2" font-family="Arial" font-weight="bold">Ai-COACHING</text>
+</svg>
