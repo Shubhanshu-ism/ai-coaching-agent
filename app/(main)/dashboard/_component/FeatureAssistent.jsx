@@ -21,7 +21,7 @@ function FeatureAssistent() {
         <Button>Profile</Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-8 mt-10 ">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5  gap-7 mt-10 ">
         {CoachingOption.map((option, index) => (
           <BlurFade key={option.icon} delay={0.25 + index * 0.05} inView>
             <div
@@ -38,7 +38,7 @@ function FeatureAssistent() {
                     alt={option.name}
                     width={150}
                     height={150}
-                    className="h-[70px] w-[70px] hover:rotate-12 cursor-pointer transition-all"
+                    className="h-[80px] w-[80px] hover:rotate-12 cursor-pointer transition-all"
                   />
                   <h2 className="mt-2">{option.name} </h2>
                 </div>
