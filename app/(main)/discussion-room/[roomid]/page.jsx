@@ -15,40 +15,69 @@ function DiscussionRoom() {
   });
   const [enableMic, setEnableMic] = useState(false);
   const [expert, setExpert] = useState({ name: "Sallie", avatar: "/t2.jpg" });
-  const [recordRTCLoaded, setRecordRTCLoaded] = useState(false);
-  const RecordRTCRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [transcribe, setTranscribe] = useState("");
+  const [conversation, setConversation] = useState([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognition = useRef(null);
+  const stream = useRef(null);
 
-  const recorder = useRef(null);
-  const silenceTimeout = useRef(null);
-
-  // Load RecordRTC properly
+  // Initialize Web Speech API
   useEffect(() => {
-    let isMounted = true;
-
     if (typeof window !== "undefined") {
-      import("recordrtc")
-        .then((RecordRTCModule) => {
-          if (isMounted) {
-            // Store the actual module in the ref
-            RecordRTCRef.current = RecordRTCModule.default || RecordRTCModule;
-            setRecordRTCLoaded(true);
-          }
-        })
-        .catch((err) => {
-          console.error("Error loading RecordRTC:", err);
-        });
-    }
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition.current = new SpeechRecognition();
+        recognition.current.continuous = true;
+        recognition.current.interimResults = true;
+        recognition.current.lang = "en-US";
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+        recognition.current.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map((result) => result[0].transcript)
+            .join("");
+
+          if (event.results[0].isFinal) {
+            setConversation((prev) => [
+              ...prev,
+              {
+                role: "user",
+                content: transcript,
+              },
+            ]);
+            setTranscribe((prev) => prev + " " + transcript);
+          } else {
+            // Update interim results
+            setTranscribe((prev) => {
+              const words = prev.split(" ");
+              words[words.length - 1] = transcript;
+              return words.join(" ");
+            });
+          }
+        };
+
+        recognition.current.onerror = (event) => {
+          console.error("Speech recognition error:", event.error);
+          setError(`Speech recognition error: ${event.error}`);
+        };
+
+        recognition.current.onend = () => {
+          if (isRecording) {
+            recognition.current.start();
+          }
+        };
+      } else {
+        setError("Speech recognition is not supported in this browser");
+      }
+    }
+  }, [isRecording]);
 
   // Set expert data when DiscussionRoomData changes
   useEffect(() => {
     if (DiscussionRoomData) {
       const Expert = CoachingExpert.find(
-        (item) => item.name == DiscussionRoomData.expertName
+        (item) => item.name === DiscussionRoomData.expertName
       );
       if (Expert) {
         setExpert(Expert);
@@ -56,115 +85,123 @@ function DiscussionRoom() {
     }
   }, [DiscussionRoomData]);
 
-  const connectToServer = async () => {
-    if (!recordRTCLoaded || !RecordRTCRef.current) {
-      console.error("RecordRTC library not loaded yet");
-      return;
-    }
-
+  // Cleanup function
+  const cleanup = async () => {
     try {
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Use the RecordRTC module from our ref
-      const RecordRTC = RecordRTCRef.current;
-
-      // Create RecordRTC instance
-      recorder.current = new RecordRTC(stream, {
-        type: "audio",
-        mimeType: "audio/webm;codecs=pcm",
-        recorderType: RecordRTC.StereoAudioRecorder,
-        timeSlice: 250,
-        desiredSampRate: 16000,
-        numberOfAudioChannels: 1,
-        bufferSize: 4096,
-        audioBitsPerSecond: 128000,
-        ondataavailable: async (blob) => {
-          // Reset the silence detection timer on audio input
-          clearTimeout(silenceTimeout.current);
-
-          const buffer = await blob.arrayBuffer();
-          console.log(buffer);
-
-          // Restart the silence detection timer
-          silenceTimeout.current = setTimeout(() => {
-            console.log("User stopped talking");
-            // Handle user stopped talking
-          }, 2000);
-        },
-      });
-
-      // Start recording
-      recorder.current.startRecording();
-      setEnableMic(true);
+      if (recognition.current) {
+        recognition.current.stop();
+      }
+      if (stream.current) {
+        stream.current.getTracks().forEach((track) => track.stop());
+        stream.current = null;
+      }
+      setIsRecording(false);
+      setEnableMic(false);
     } catch (err) {
-      console.error("Error connecting to microphone:", err);
+      console.error("Error during cleanup:", err);
     }
   };
 
-  const disconnect = (e) => {
-    e.preventDefault();
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, []);
 
-    if (
-      recorder.current &&
-      typeof recorder.current.pauseRecording === "function"
-    ) {
-      recorder.current.pauseRecording();
-      recorder.current = null;
+  const startRecording = async () => {
+    try {
+      setError(null);
+      if (!recognition.current) {
+        throw new Error("Speech recognition is not supported");
+      }
+
+      // Get microphone access
+      stream.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+      // Start speech recognition
+      recognition.current.start();
+      setIsRecording(true);
+      setEnableMic(true);
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      setError(err.message || "Failed to start recording");
+      await cleanup();
     }
+  };
 
-    if (silenceTimeout.current) {
-      clearTimeout(silenceTimeout.current);
+  const toggleMic = async () => {
+    if (enableMic) {
+      await cleanup();
+    } else {
+      await startRecording();
     }
-
-    setEnableMic(false);
   };
 
   return (
-    <div className="-mt-12">
-      <h2 className="text-lg font-bold">
-        {DiscussionRoomData?.coachingOption}
-      </h2>
+    <div className="flex flex-col h-screen">
+      <div className="-mt-12">
+        <h2 className="text-lg font-bold">
+          {DiscussionRoomData?.coachingOption}
+        </h2>
 
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2">
-          <div className=" h-[60vh] bg-secondary border rounded-4xl flex flex-col items-center justify-center relative">
-            <Image
-              alt="avatar"
-              src={expert?.avatar}
-              width={200}
-              height={200}
-              className="h-[80px] w-[80px] rounded-full object-cover animate-pulse"
-            />
-            <h2 className="text-gray-500">{expert?.name}</h2>
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-10">
+          <div className="lg:col-span-2">
+            <div className="h-[60vh] bg-secondary border rounded-4xl flex flex-col items-center justify-center relative">
+              <Image
+                alt="avatar"
+                src={expert?.avatar}
+                width={200}
+                height={200}
+                className="h-[80px] w-[80px] rounded-full object-cover animate-pulse"
+              />
+              <h2 className="text-gray-500">{expert?.name}</h2>
 
-            <div className="p-5 bg-gray-200 px-10 rounded-lg absolute bottom-10 right-10">
-              <UserButton />
+              <div className="p-5 bg-gray-200 px-10 rounded-lg absolute bottom-10 right-10">
+                <UserButton />
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-center gap-4">
+              {!enableMic ? (
+                <Button onClick={toggleMic} disabled={isRecording}>
+                  Start Recording
+                </Button>
+              ) : (
+                <Button variant="destructive" onClick={toggleMic}>
+                  Stop Recording
+                </Button>
+              )}
+              {isRecording && (
+                <div className="text-red-500 animate-pulse">Recording...</div>
+              )}
             </div>
           </div>
-          <div className="mt-5 flex items-center justify-center">
-            {!enableMic ? (
-              <Button onClick={connectToServer} disabled={!recordRTCLoaded}>
-                Connect
-              </Button>
-            ) : (
-              <Button variant="destructive" onClick={disconnect}>
-                Disconnect
-              </Button>
-            )}
+
+          <div>
+            <div className="h-[60vh] bg-secondary border rounded-4xl flex flex-col items-center justify-center relative">
+              <h2>Chat Section</h2>
+            </div>
+            <h2 className="mt-3 text-gray-400 text-sm">
+              At the end of your conversation we will automatically generate
+              feedback/notes from your conversation
+            </h2>
           </div>
         </div>
-
-        <div>
-          <div className=" h-[60vh] bg-secondary border rounded-4xl flex flex-col items-center justify-center relative">
-            <h2>Chat Section</h2>
-          </div>
-          <h2 className="mt-3 text-gray-400 text-sm">
-            At the end of your conversation we will automatically generate
-            feedback/notes from your conversation
-          </h2>
+        <div className="mt-5">
+          <h2>{transcribe}</h2>
         </div>
       </div>
+      {error && (
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
     </div>
   );
 }
