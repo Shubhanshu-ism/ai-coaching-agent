@@ -8,6 +8,17 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
+import { AIModel } from "@/services/GlobalServices";
+import { Loader2Icon } from "lucide-react";
+import ChatBox from "./_component/ChatBox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // Import RecordRTC with proper configuration
 const RecordRTC = dynamic(
@@ -23,14 +34,20 @@ function DiscussionRoom() {
     id: roomid,
   });
   const [enableMic, setEnableMic] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [permissionError, setPermissionError] = useState("");
   const recorder = useRef(null);
   const stream = useRef(null);
   const silenceTimeout = useRef(null);
   const speechRecognition = useRef(null);
   const [transcripts, setTranscripts] = useState([]);
-  const [conversation, setConversation] = useState([]); // Add conversation state
+  const [conversation, setConversation] = useState([
+    { role: "assistant", content: "Hi" },
+    { role: "user", content: "Hello" },
+  ]);
+  const [loading, setLoading] = useState(false);
   const [expert, setExpert] = useState({
-    name: "Sallie",
+    name: "Salli",
     avatar: "/t2.jpg",
   });
 
@@ -82,7 +99,7 @@ function DiscussionRoom() {
       speechRecognition.current.interimResults = true;
       speechRecognition.current.lang = "en-US";
 
-      speechRecognition.current.onresult = (event) => {
+      speechRecognition.current.onresult = async (event) => {
         let interimTranscript = "";
         let finalTranscript = "";
         let confidence = 0;
@@ -125,7 +142,7 @@ function DiscussionRoom() {
             text_formatted: interimTranscript,
           };
 
-          console.log("Partial transcript:", partialResult);
+          // console.log("Partial transcript:", partialResult);
           setTranscripts((prev) => [
             ...prev.filter((t) => t.message_type !== "partialTranscript"),
             partialResult,
@@ -145,7 +162,7 @@ function DiscussionRoom() {
             text_formatted: finalTranscript,
           };
 
-          console.log("Final transcript:", finalResult);
+          // console.log("Final transcript:", finalResult);
           setTranscripts((prev) => [
             ...prev.filter((t) => t.message_type !== "partialTranscript"),
             finalResult,
@@ -156,6 +173,15 @@ function DiscussionRoom() {
             ...prev,
             { role: "user", content: finalResult.text },
           ]);
+          //Calling AI Model
+          
+          const aiResponse = await AIModel(
+            DiscussionRoomData.topic,
+            DiscussionRoomData.coachingOption,
+            finalResult.text
+          );
+          console.log(aiResponse);
+          setConversation((prev) => [...prev, aiResponse]);
         }
       };
 
@@ -168,66 +194,104 @@ function DiscussionRoom() {
     return false;
   };
 
+  const requestMicrophonePermission = async () => {
+    try {
+      setLoading(true);
+
+      // First check if we already have permission
+      const permissionStatus = await navigator.permissions.query({
+        name: "microphone",
+      });
+
+      if (permissionStatus.state === "denied") {
+        setPermissionError(
+          "Microphone access was denied. Please enable it in your browser settings."
+        );
+        setShowPermissionDialog(true);
+        return false;
+      }
+
+      // Request microphone access
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+      stream.current = audioStream;
+      return true;
+    } catch (err) {
+      console.error("Error requesting microphone permission:", err);
+      setPermissionError(
+        err.message ||
+          "Failed to access microphone. Please check your browser settings."
+      );
+      setShowPermissionDialog(true);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const connectToServer = async () => {
     try {
-      setEnableMic(true);
-      if (typeof window !== "undefined" && typeof navigator !== "undefined") {
-        const audioStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        stream.current = audioStream;
-
-        // Initialize speech recognition
-        const speechInitialized = initializeSpeechRecognition();
-        if (speechInitialized) {
-          speechRecognition.current.start();
-        }
-
-        // Wait for RecordRTC to be loaded
-        const RecordRTCModule = await import("recordrtc");
-        const RecordRTCConstructor = RecordRTCModule.default;
-
-        recorder.current = new RecordRTCConstructor(audioStream, {
-          type: "audio",
-          mimeType: "audio/webm;codecs=pcm",
-          recorderType: RecordRTCConstructor.StereoAudioRecorder,
-          timeSlice: 250,
-          desiredSampRate: 16000,
-          numberOfAudioChannels: 1,
-          bufferSize: 4096,
-          audioBitsPerSecond: 128000,
-          ondataavailable: async (blob) => {
-            // Reset the silence detection timer on audio input
-            if (silenceTimeout.current) {
-              clearTimeout(silenceTimeout.current);
-            }
-
-            const buffer = await blob.arrayBuffer();
-            console.log("Audio data received:", buffer.byteLength, "bytes");
-
-            // Process the buffer - in this implementation, the actual transcription
-            // is handled by the Speech Recognition API, but we call this for consistency
-            const transcriptObj = await processAudioBuffer(buffer);
-
-            // Restart the silence detection timer
-            silenceTimeout.current = setTimeout(() => {
-              console.log("User stopped talking");
-              // Optionally force a final transcript here
-            }, 2000);
-          },
-        });
-
-        // Start recording
-        await recorder.current.startRecording();
-        console.log("Recording started");
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        setEnableMic(false);
+        return;
       }
+
+      setEnableMic(true);
+      setLoading(true);
+      setShowPermissionDialog(false); // Hide dialog when permission is granted
+
+      // Initialize speech recognition
+      const speechInitialized = initializeSpeechRecognition();
+      if (speechInitialized) {
+        speechRecognition.current.start();
+      }
+
+      // Wait for RecordRTC to be loaded
+      const RecordRTCModule = await import("recordrtc");
+      const RecordRTCConstructor = RecordRTCModule.default;
+
+      recorder.current = new RecordRTCConstructor(stream.current, {
+        type: "audio",
+        mimeType: "audio/webm;codecs=pcm",
+        recorderType: RecordRTCConstructor.StereoAudioRecorder,
+        timeSlice: 250,
+        desiredSampRate: 16000,
+        numberOfAudioChannels: 1,
+        bufferSize: 4096,
+        audioBitsPerSecond: 128000,
+        ondataavailable: async (blob) => {
+          if (silenceTimeout.current) {
+            clearTimeout(silenceTimeout.current);
+          }
+
+          const buffer = await blob.arrayBuffer();
+          // console.log("Audio data received:", buffer.byteLength, "bytes");
+
+          const transcriptObj = await processAudioBuffer(buffer);
+
+          silenceTimeout.current = setTimeout(() => {
+            console.log("User stopped talking");
+          }, 2000);
+        },
+      });
+
+      await recorder.current.startRecording();
+      console.log("Recording started");
     } catch (err) {
       console.error("Error starting recording:", err);
       setEnableMic(false);
+      setPermissionError(err.message || "Failed to start recording");
+      setShowPermissionDialog(true);
+    } finally {
+      setLoading(false);
     }
   };
 
   const disconnectFromServer = async (e) => {
+    setLoading(true);
     if (e && e.preventDefault) e.preventDefault();
     try {
       if (speechRecognition.current) {
@@ -238,7 +302,7 @@ function DiscussionRoom() {
       if (recorder.current) {
         await recorder.current.stopRecording(() => {
           const blob = recorder.current.getBlob();
-          console.log("Recording stopped, blob size:", blob.size);
+          // console.log("Recording stopped, blob size:", blob.size);
           recorder.current = null;
         });
       }
@@ -254,6 +318,7 @@ function DiscussionRoom() {
     } catch (err) {
       console.error("Error stopping recording:", err);
     }
+    setLoading(false);
   };
 
   // Cleanup on unmount
@@ -287,9 +352,17 @@ function DiscussionRoom() {
           </div>
           <div className="mt-5 flex items-center justify-center">
             {!enableMic ? (
-              <Button onClick={connectToServer}>Connect to Expert</Button>
+              <Button onClick={connectToServer} disabled={loading}>
+                {loading && <Loader2Icon className="animate-spin mr-2" />}{" "}
+                Connect to Expert
+              </Button>
             ) : (
-              <Button variant="destructive" onClick={disconnectFromServer}>
+              <Button
+                variant="destructive"
+                onClick={disconnectFromServer}
+                disabled={loading}
+              >
+                {loading && <Loader2Icon className="animate-spin mr-2" />}{" "}
                 Disconnect
               </Button>
             )}
@@ -297,17 +370,9 @@ function DiscussionRoom() {
         </div>
 
         <div>
-          <div className="h-[60vh] bg-secondary border rounded-4xl flex flex-col items-start justify-start p-4 overflow-y-auto">
+          <div className="h-[60vh] bg-secondary border rounded-4xl flex flex-col p-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <h2 className="font-bold mb-4">Chat Section</h2>
-            {conversation.map((message, index) => (
-              <div
-                key={index}
-                className={`mb-3 p-2 rounded ${message.role === "user" ? "rounded-2xl  bg-blue-100 ml-auto" : "bg-gray-100" }`}
-              >
-                <p>{message.content}</p>
-                {/* <small className="text-xs text-gray-500">{message.role}</small> */}
-              </div>
-            ))}
+            <ChatBox conversation={conversation} />
           </div>
           <h2 className="mt-3 text-gray-400 text-sm">
             At the end of your conversation we will automatically generate
@@ -336,6 +401,45 @@ function DiscussionRoom() {
           </p>
         </div>
       </div>
+
+      {/* Permission Dialog */}
+      <Dialog
+        open={showPermissionDialog && !enableMic}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowPermissionDialog(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Microphone Permission Required</DialogTitle>
+            <DialogDescription>
+              {permissionError ||
+                "This application needs access to your microphone to record your voice. Please allow microphone access to continue."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPermissionDialog(false);
+                setEnableMic(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowPermissionDialog(false);
+                connectToServer();
+              }}
+            >
+              Try Again
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
