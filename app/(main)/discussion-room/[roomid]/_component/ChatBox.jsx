@@ -71,7 +71,7 @@ function ChatBox({ conversation }) {
           <div
             key={index}
             className={`flex ${
-              message.role === "user" ? "justify-start" : "justify-end"
+              message.role !== "user" ? "justify-start" : "justify-end"
             }`}
           >
             <div
