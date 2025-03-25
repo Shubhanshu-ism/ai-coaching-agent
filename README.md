@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# AI Coaching Platform
+
+An intelligent coaching platform powered by AI that provides personalized learning experiences across multiple domains.
+
+![AI Coaching Dashboard](public/geminiCoachingLogo.svg)
+
+## Overview
+
+AI Coaching is a comprehensive learning platform that leverages artificial intelligence to provide personalized coaching experiences. The platform offers various learning modules designed to help users improve their skills, knowledge, and personal development.
+
+## Features
+
+### 1. Topic Lecture
+
+- AI-powered lectures on various topics
+- Personalized content delivery
+- Interactive learning experience
+- Real-time feedback and adjustments
+
+### 2. Mock Interview
+
+- Simulated interview environments
+- Real-time feedback on responses
+- Industry-specific questions
+- Performance analysis and improvement suggestions
+
+### 3. Q&A Practice
+
+- Interactive question-and-answer sessions
+- Personalized difficulty adjustment
+- Comprehensive explanations
+- Progress tracking and analytics
+
+### 4. Language Learning
+
+- Conversational language practice
+- Pronunciation feedback
+- Vocabulary building
+- Grammar assistance and corrections
+
+### 5. Meditation Guide
+
+- Guided meditation sessions
+- Personalized mindfulness exercises
+- Stress reduction techniques
+- Progress tracking and wellness metrics
+
+## Technical Features
+
+- Real-time speech recognition for interactive conversations
+- Natural language processing for understanding and responding to queries
+- User authentication and session management
+- Progress tracking and analytics
+- Responsive design for all devices
+- Token-based credit system for session management
+
+## User Experience
+
+- Personalized dashboard with progress tracking
+- Previous session history and feedback
+- Credit system for managing usage
+- Profile management
+- Real-time interaction with AI coach
+
+## Technology Stack
+
+- Next.js for the frontend framework
+- Stack Auth for authentication
+- TailwindCSS for styling
+- WebSpeech API for voice recognition
+- AI/ML models for coaching logic
+- Convex for backend services
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Set up environment variables:
+
+```bash
+cp .env.example .env.local
+```
+
+4. Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+The following environment variables are required:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `NEXT_PUBLIC_STACK_API_KEY`: Your Stack Auth API key
+- `NEXT_PUBLIC_CONVEX_URL`: Your Convex deployment URL
+- Additional API keys for AI services
 
-## Learn More
+## Contributing
 
-To learn more about Next.js, take a look at the following resources:
+Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Deploy on Vercel
+## Support
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+For support, please open an issue in the GitHub repository or contact our support team.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+Built with ❤️ by the AI Coaching Team
