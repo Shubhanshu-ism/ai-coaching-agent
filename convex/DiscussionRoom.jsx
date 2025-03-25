@@ -51,3 +51,17 @@ export const UpdateSessionFeedback = mutation({
     });
   },
 });
+
+export const GetAllDiscussionRoom = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("DiscussionRoom")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .order("desc")
+      .collect();
+    return result;
+  },
+});
