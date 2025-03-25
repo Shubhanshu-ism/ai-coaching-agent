@@ -7,7 +7,7 @@ import { CoachingOption } from "@/services/Options";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import moment from "moment";
-
+import Link from "next/link";
 function Feedback() {
   const convex = useConvex();
   const { userData } = useContext(UserContext);
@@ -57,12 +57,14 @@ function Feedback() {
                       </h2>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="invisible group-hover:visible"
+                  <Link href={`/view-summary/${item._id}`}>
+                    <Button
+                      variant="outline"
+                      className="invisible group-hover:visible"
                   >
-                    View Notes
+                    View Feedback
                   </Button>
+                  </Link>
                 </div>
               )
           )}

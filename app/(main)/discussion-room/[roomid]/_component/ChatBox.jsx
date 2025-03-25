@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ReactMarkdown from "react-markdown";
 
-function ChatBox({ conversation, DiscussionRoomData }) {
+function ChatBox({ conversation = [], DiscussionRoomData }) {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -12,9 +13,9 @@ function ChatBox({ conversation, DiscussionRoomData }) {
   const UpdateSummary = useMutation(api.DiscussionRoom.UpdateSessionFeedback);
 
   // Filter out any messages that are marked as feedback summaries
-  const filteredConversation = conversation.filter(
-    (message) => !message.isFeedbackSummary
-  );
+  const filteredConversation = Array.isArray(conversation)
+    ? conversation.filter((message) => !message.isFeedbackSummary)
+    : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,37 +41,6 @@ function ChatBox({ conversation, DiscussionRoomData }) {
     }
   }, [filteredConversation]); // Use filtered conversation for dependency
 
-  const formatMessage = (content) => {
-    // Check if content is undefined or null
-    if (!content) return "";
-
-    // First split by line breaks
-    return content.split("\n").map((line, lineIndex) => {
-      // Then process bold text within each line
-      const formattedLine = line
-        .split(/(\*\*.*?\*\*)/)
-        .map((part, partIndex) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            // Remove the ** and make the text bold
-            return (
-              <span key={`${lineIndex}-${partIndex}`} className="font-bold">
-                {part.slice(2, -2)}
-              </span>
-            );
-          }
-          return part;
-        });
-
-      // Return the line with a line break if it's not the last line
-      return (
-        <React.Fragment key={lineIndex}>
-          {formattedLine}
-          {lineIndex < content.split("\n").length - 1 && <br />}
-        </React.Fragment>
-      );
-    });
-  };
-
   return (
     <div className="relative h-full">
       <div
@@ -92,9 +62,9 @@ function ChatBox({ conversation, DiscussionRoomData }) {
                   : "bg-gray-200 text-gray-900"
               }`}
             >
-              <p className="text-sm whitespace-pre-line">
-                {formatMessage(message.content)}
-              </p>
+              <div className="text-sm whitespace-pre-line markdown-content">
+                <ReactMarkdown>{message.content || ""}</ReactMarkdown>
+              </div>
               <span className="text-xs text-gray-500 mt-1 block">
                 {message.role === "user" ? "You" : "Assistant"}
               </span>

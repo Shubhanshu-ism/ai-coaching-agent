@@ -6,7 +6,7 @@ import { useUser } from '@stackframe/stack'
 import Image from 'next/image';
 import React from 'react'
 import UserInputDialog from './UserInputDialog';
-
+import ProfileDialog from './ProfileDialog';
 function FeatureAssistent() {
     const user = useUser();
   return (
@@ -18,7 +18,9 @@ function FeatureAssistent() {
             Welcome back {user?.displayName}{" "}
           </h2>
         </div>
-        <Button>Profile</Button>
+        <ProfileDialog>
+          <Button>Profile</Button>
+        </ProfileDialog>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5  gap-7 mt-10 ">
@@ -51,4 +53,4 @@ function FeatureAssistent() {
   );
 }
 
-export default FeatureAssistent
+export default FeatureAssistent;

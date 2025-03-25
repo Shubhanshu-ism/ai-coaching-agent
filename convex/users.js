@@ -17,7 +17,7 @@ export const CreateUser = mutation({
       const data = {
         name: args.name,
         email: args.email,
-        credits: 50000,
+        credits: 5000,
       };
       const result = await ctx.db.insert("users", {
         ...data,
@@ -28,3 +28,15 @@ export const CreateUser = mutation({
     return userData[0];
   },
 });
+
+export const UpdateUserToken = mutation({
+    args:{
+      id:v.id("users"),
+      credits:v.number()
+    },
+    handler:async(ctx,args)=>{
+      await ctx.db.patch(args.id,{
+        credits:args.credits
+      })
+    }
+})

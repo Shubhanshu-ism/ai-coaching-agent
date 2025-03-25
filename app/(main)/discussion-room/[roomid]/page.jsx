@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { CoachingExpert } from "@/services/Options";
 import { UserButton } from "@stackframe/stack";
+import Webcam from "react-webcam";
 import { useQuery } from "convex/react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import dynamic from "next/dynamic";
 import {
   AIModel,
@@ -23,6 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { UserContext } from "@/app/_context/UserContext";
 
 // Import RecordRTC with proper configuration
 const RecordRTC = dynamic(
@@ -100,7 +102,7 @@ function DiscussionRoom() {
   const DiscussionRoomData = useQuery(api.DiscussionRoom.GetDiscussionRoom, {
     id: roomid,
   });
-
+  const { userData, setUserData } = useContext(UserContext);
   // All useState hooks
   const [enableMic, setEnableMic] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -147,7 +149,7 @@ function DiscussionRoom() {
   const [speechRecognitionErrors, setSpeechRecognitionErrors] = useState(0);
   const [showRecognitionStatus, setShowRecognitionStatus] = useState(false);
   const recognitionResetTimer = useRef(null);
-
+  const updateUserToken = useMutation(api.users.UpdateUserToken);
   // Add function to handle conversation start
   const handleStart = async () => {
     try {
@@ -383,7 +385,20 @@ function DiscussionRoom() {
       setEnableFeedbackNotes(true);
     }
   };
-
+  const UpdateUserTokenMethod = async (text) => {
+    const tokenCount = text.trim().split(/\s+/).length;
+    const result = await updateUserToken({
+      id: userData._id,
+      credits: Number(userData.credits) - Number(tokenCount),
+    });
+    if (result) {
+      console.log("User token updated successfully");
+      setUserData((prev) => ({
+        ...prev,
+        credits: Number(prev.credits) - Number(tokenCount),
+      }));
+    }
+  };
   // All useEffect hooks
   useEffect(() => {
     if (DiscussionRoomData) {
@@ -944,6 +959,8 @@ function DiscussionRoom() {
                     id: DiscussionRoomData._id,
                     conversation: cleanedConversation,
                   });
+                  // Remove await since we're in a callback function
+                  UpdateUserTokenMethod(aiResponse.content);
                 }
                 return cleanedConversation;
               });
@@ -1244,8 +1261,15 @@ function DiscussionRoom() {
             )}
             <h2 className="text-gray-500">{expert?.name}</h2>
 
-            <div className="p-5 bg-gray-200 px-10 rounded-lg absolute bottom-10 right-10">
+            {/* <div className="p-5 bg-gray-200 px-10 rounded-lg absolute bottom-10 right-10">
               <UserButton />
+            </div> */}
+            <div className="absolute bottom-10 right-10">
+              <Webcam
+                height={100}
+                width={150}
+                className="p-5  rounded-4xl"
+              />
             </div>
           </div>
           <div className="mt-5 flex items-center justify-center gap-4">

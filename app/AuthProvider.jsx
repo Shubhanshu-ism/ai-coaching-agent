@@ -21,7 +21,7 @@ import { UserContext } from './_context/UserContext';
             name:user?.displayName,
             email:user?.primaryEmail
         })
-        console.log(result)
+        // console.log(result)
         setUserData(result)
     }
    return (
