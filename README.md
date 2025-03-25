@@ -14,7 +14,7 @@ An intelligent coaching platform powered by AI that provides personalized learni
   <img src="public/Discussion-Room.png" alt="AI Coaching Dashboard" width="800"/>
 
   # View Summary
-  
+
   <img src="public/View-Summary.png" alt="AI Coaching Dashboard" width="800"/>
 </div>
 
@@ -30,42 +30,6 @@ AI Coaching is a comprehensive learning platform that leverages artificial intel
   <img src="public/qa.png" alt="Q&A Practice" width="150"/>
   <img src="public/language.png" alt="Language Learning" width="150"/>
   <img src="public/meditation.png" alt="Meditation Guide" width="150"/>
-</div>
-
-### Interactive Learning Experience
-
-Here's how our platform works across different learning modules:
-
-<div align="center">
-  <h3>1. Live Q&A Session</h3>
-  <img src="public/t3.jpg" alt="Q&A Practice Interface" width="800"/>
-  <p>Interactive sessions with AI coach Salli providing real-time responses and guidance</p>
-
-  <h3>2. Session Summary and Feedback</h3>
-  <img src="public/t4.png" alt="Session Summary" width="800"/>
-  <p>Detailed session summary with strengths and areas for improvement</p>
-
-  <h3>3. Visual Learning Aids</h3>
-  <div style="display: flex; justify-content: space-between; margin: 20px 0;">
-    <img src="public/ab1.png" alt="Learning Visual 1" width="150"/>
-    <img src="public/ab2.png" alt="Learning Visual 2" width="150"/>
-    <img src="public/ab3.png" alt="Learning Visual 3" width="150"/>
-    <img src="public/ab4.png" alt="Learning Visual 4" width="150"/>
-    <img src="public/ab5.png" alt="Learning Visual 5" width="150"/>
-  </div>
-  <p>Rich visual content to enhance learning experience</p>
-
-  <h3>4. Topic-Based Learning</h3>
-  <div style="display: flex; justify-content: space-around; margin: 20px 0;">
-    <div>
-      <img src="public/t1.avif" alt="Topic Example 1" width="380"/>
-      <p>Structured Learning Paths</p>
-    </div>
-    <div>
-      <img src="public/t2.jpg" alt="Topic Example 2" width="380"/>
-      <p>Interactive Exercises</p>
-    </div>
-  </div>
 </div>
 
 ### 1. Topic Lecture
