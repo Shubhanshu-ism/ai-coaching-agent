@@ -120,6 +120,10 @@ The following environment variables are required:
 
 - `NEXT_PUBLIC_STACK_API_KEY`: Your Stack Auth API key
 - `NEXT_PUBLIC_CONVEX_URL`: Your Convex deployment URL
+- `STACK_SECRET_SERVER_KEY , OPENROUTER_API_KEY`: Your Stack Key
+- `NEXT_PUBLIC_AI_OPENROUTER`: Openrouter Ai API key
+- `CONVEX_SELF_HOSTED_URL`: Convex self hosted key
+- `CONVEX_SELF_HOSTED_ADMIN_KEY` Convex self hosted Admin key
 - Additional API keys for AI services
 
 ## Contributing
