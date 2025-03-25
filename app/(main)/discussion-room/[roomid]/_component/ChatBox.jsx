@@ -1,12 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
-function ChatBox({ conversation }) {
+function ChatBox({ conversation, DiscussionRoomData }) {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const UpdateSummary = useMutation(api.DiscussionRoom.UpdateSessionFeedback);
+
+  // Filter out any messages that are marked as feedback summaries
+  const filteredConversation = conversation.filter(
+    (message) => !message.isFeedbackSummary
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,9 +38,12 @@ function ChatBox({ conversation }) {
     if (isAutoScroll) {
       scrollToBottom();
     }
-  }, [conversation]);
+  }, [filteredConversation]); // Use filtered conversation for dependency
 
   const formatMessage = (content) => {
+    // Check if content is undefined or null
+    if (!content) return "";
+
     // First split by line breaks
     return content.split("\n").map((line, lineIndex) => {
       // Then process bold text within each line
@@ -67,7 +78,7 @@ function ChatBox({ conversation }) {
         onScroll={handleScroll}
         className="flex flex-col space-y-4 h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
-        {conversation.map((message, index) => (
+        {filteredConversation.map((message, index) => (
           <div
             key={index}
             className={`flex ${
@@ -84,9 +95,9 @@ function ChatBox({ conversation }) {
               <p className="text-sm whitespace-pre-line">
                 {formatMessage(message.content)}
               </p>
-              {/* <span className="text-xs text-gray-500 mt-1 block">
+              <span className="text-xs text-gray-500 mt-1 block">
                 {message.role === "user" ? "You" : "Assistant"}
-              </span> */}
+              </span>
             </div>
           </div>
         ))}

@@ -8,7 +8,10 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
-import { AIModel } from "@/services/GlobalServices";
+import {
+  AIModel,
+  AIModelToGenerateFeedbackAndNotes,
+} from "@/services/GlobalServices";
 import { Loader2Icon } from "lucide-react";
 import ChatBox from "./_component/ChatBox";
 import { useMutation } from "convex/react";
@@ -29,6 +32,69 @@ const RecordRTC = dynamic(
   }
 );
 
+// Add the cleanup function at a higher scope, before any React component functions
+// Add it after the imports
+
+// Utility function to clean up conversation arrays by flattening and deduplicating
+const cleanupConversationArray = (conversation) => {
+  if (!Array.isArray(conversation)) {
+    console.error("Invalid conversation data:", conversation);
+    return []; // Return empty array for invalid input
+  }
+
+  // Flatten the nested arrays
+  const flattenConversation = (arr) => {
+    const result = [];
+
+    const flatten = (items) => {
+      if (!items) return;
+
+      for (const item of items) {
+        if (Array.isArray(item)) {
+          flatten(item);
+        } else if (
+          item &&
+          typeof item === "object" &&
+          item.role &&
+          item.content
+        ) {
+          result.push(item);
+        }
+      }
+    };
+
+    flatten(arr);
+    return result;
+  };
+
+  // Deduplicate messages based on content and role
+  const deduplicateMessages = (messages) => {
+    const seen = new Set();
+    return messages.filter((message) => {
+      const key = `${message.role}:${message.content}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const flattened = flattenConversation(conversation);
+  const deduplicated = deduplicateMessages(flattened);
+
+  // Limit conversation size to prevent excessive memory usage and API issues
+  const MAX_MESSAGES = 50; // Set a reasonable limit
+  const limitedMessages =
+    deduplicated.length > MAX_MESSAGES
+      ? deduplicated.slice(-MAX_MESSAGES)
+      : deduplicated;
+
+  console.log(
+    `Cleaned up conversation: ${conversation.length} items → ${flattened.length} flattened → ${deduplicated.length} deduplicated → ${limitedMessages.length} limited`
+  );
+
+  return limitedMessages;
+};
+
 function DiscussionRoom() {
   const { roomid } = useParams();
   const DiscussionRoomData = useQuery(api.DiscussionRoom.GetDiscussionRoom, {
@@ -47,6 +113,8 @@ function DiscussionRoom() {
     avatar: "/t2.jpg",
   });
   const [isStarted, setIsStarted] = useState(false);
+  const [enableFeedbackNotes, setEnableFeedbackNotes] = useState(false);
+  const [feedbackContent, setFeedbackContent] = useState("");
 
   // All useRef hooks
   const recorder = useRef(null);
@@ -56,6 +124,9 @@ function DiscussionRoom() {
 
   // All useMutation hooks
   const UpdateConversation = useMutation(api.DiscussionRoom.UpdateConversation);
+  const UpdateSessionFeedback = useMutation(
+    api.DiscussionRoom.UpdateSessionFeedback
+  );
 
   // Add new state to track speech recognition status
   const [isSpeechRecognitionActive, setIsSpeechRecognitionActive] =
@@ -78,15 +149,51 @@ function DiscussionRoom() {
   const recognitionResetTimer = useRef(null);
 
   // Add function to handle conversation start
-  const handleStart = () => {
-    setIsStarted(true);
-    // Initialize the conversation with a more detailed, personalized greeting
-    setConversation([
-      {
-        role: "assistant",
-        content: `Hello! I'm ${expert.name}, your ${DiscussionRoomData?.coachingOption} expert on "${DiscussionRoomData?.topic}". I'll be guiding you through this topic with interactive discussion. Feel free to ask questions or share what you already know, and we'll build on that together. What would you like to focus on first?`,
-      },
-    ]);
+  const handleStart = async () => {
+    try {
+      setLoading(true);
+      setIsStarted(true);
+
+      // Start speech recognition if it's not already active
+      if (
+        speechRecognition.current &&
+        !isSpeechRecognitionActive &&
+        !isPaused
+      ) {
+        try {
+          console.log("Starting speech recognition for new conversation");
+          speechRecognition.current.start();
+        } catch (startError) {
+          console.error("Error starting speech recognition:", startError);
+          // Re-initialize if start failed
+          speechRecognition.current = null;
+          initializeSpeechRecognition();
+          if (speechRecognition.current) {
+            speechRecognition.current.start();
+          }
+        }
+      }
+
+      // Start recording if it's not already active
+      if (recorder.current && !recorder.current.state) {
+        console.log("Starting audio recording");
+        await recorder.current.startRecording();
+      }
+
+      // Initialize the conversation with a more detailed, personalized greeting
+      setConversation([
+        {
+          role: "assistant",
+          content: `Hello! I'm ${expert.name}, your ${DiscussionRoomData?.coachingOption} expert on "${DiscussionRoomData?.topic}". I'll be guiding you through this topic with interactive discussion. Feel free to ask questions or share what you already know, and we'll build on that together. What would you like to focus on first?`,
+        },
+      ]);
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      // Show an error message to the user
+      alert("Failed to start conversation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Add function to handle pause/resume
@@ -101,37 +208,92 @@ function DiscussionRoom() {
       );
 
       if (isPaused) {
-        // Resume speech recognition
-        console.log("Attempting to resume speech recognition...");
+        // Resume speech recognition and recording
+        console.log("Attempting to resume speech recognition and recording...");
         setIsPaused(false); // Update state first
 
-        // Only start if not already active
+        // Start recording if it's not already active
+        if (recorder.current) {
+          try {
+            if (!recorder.current.state) {
+              console.log("Resuming audio recording");
+              await recorder.current.startRecording();
+            } else {
+              console.log("Audio recording already active");
+            }
+          } catch (recordError) {
+            console.error("Error resuming recording:", recordError);
+            // Re-initialize recorder if needed
+            if (stream.current) {
+              const RecordRTCModule = await import("recordrtc");
+              const RecordRTCConstructor = RecordRTCModule.default;
+              recorder.current = new RecordRTCConstructor(stream.current, {
+                type: "audio",
+                mimeType: "audio/webm;codecs=pcm",
+                recorderType: RecordRTCConstructor.StereoAudioRecorder,
+                timeSlice: 250,
+                desiredSampRate: 16000,
+                numberOfAudioChannels: 1,
+                bufferSize: 4096,
+                audioBitsPerSecond: 128000,
+              });
+              await recorder.current.startRecording();
+            }
+          }
+        }
+
+        // Only start speech recognition if not already active and not waiting for AI
         if (
           speechRecognition.current &&
           !isSpeechRecognitionActive &&
           !isWaitingForAI
         ) {
           try {
+            console.log("Starting speech recognition");
             await speechRecognition.current.start();
             console.log("Speech recognition resumed successfully");
           } catch (startError) {
             console.error("Error starting speech recognition:", startError);
-            // Re-initialize if start failed
+            // Re-initialize speech recognition if start failed
             speechRecognition.current = null;
             initializeSpeechRecognition();
             if (speechRecognition.current) {
-              speechRecognition.current.start();
+              try {
+                console.log("Retrying with new speech recognition instance");
+                await speechRecognition.current.start();
+              } catch (retryError) {
+                console.error(
+                  "Failed to restart speech recognition:",
+                  retryError
+                );
+                alert(
+                  "Failed to restart speech recognition. Please try disconnecting and reconnecting."
+                );
+              }
             }
           }
+        } else {
+          console.log("Speech recognition already active or waiting for AI");
         }
       } else {
-        // Pause speech recognition
-        console.log("Attempting to pause speech recognition...");
+        // Pause speech recognition and recording
+        console.log("Attempting to pause speech recognition and recording...");
         setIsPaused(true); // Update state first
 
-        // Only stop if already active
+        // Stop recording if active
+        if (recorder.current && recorder.current.state === "recording") {
+          try {
+            console.log("Pausing audio recording");
+            await recorder.current.pauseRecording();
+          } catch (pauseError) {
+            console.error("Error pausing recording:", pauseError);
+          }
+        }
+
+        // Only stop speech recognition if already active
         if (speechRecognition.current && isSpeechRecognitionActive) {
           try {
+            console.log("Stopping speech recognition");
             speechRecognition.current.stop();
             console.log("Speech recognition paused successfully");
           } catch (stopError) {
@@ -139,6 +301,8 @@ function DiscussionRoom() {
             // Force the state update even if stop failed
             setIsSpeechRecognitionActive(false);
           }
+        } else {
+          console.log("Speech recognition not active, nothing to pause");
         }
       }
     } catch (err) {
@@ -216,6 +380,7 @@ function DiscussionRoom() {
         });
       }
       setLoading(false);
+      setEnableFeedbackNotes(true);
     }
   };
 
@@ -291,7 +456,10 @@ function DiscussionRoom() {
       // Clean up any existing instance first
       if (speechRecognition.current) {
         try {
-          speechRecognition.current.stop();
+          if (isSpeechRecognitionActive) {
+            speechRecognition.current.stop();
+            console.log("Stopped existing speech recognition instance");
+          }
           speechRecognition.current.onstart = null;
           speechRecognition.current.onend = null;
           speechRecognition.current.onerror = null;
@@ -299,10 +467,13 @@ function DiscussionRoom() {
         } catch (e) {
           console.error("Error cleaning up speech recognition:", e);
         }
+        // Reset state after cleanup
+        setIsSpeechRecognitionActive(false);
       }
 
       // Create a new instance
       speechRecognition.current = new SpeechRecognition();
+      console.log("Created new speech recognition instance");
 
       // Configure for optimal recognition
       speechRecognition.current.continuous = true;
@@ -354,40 +525,55 @@ function DiscussionRoom() {
       speechRecognition.current.onstart = () => {
         console.log("Speech recognition started");
         setIsSpeechRecognitionActive(true);
-        setIsPaused(false);
-
-        // Reset the last speech timestamp when we start listening
-        lastSpeechTimestamp.current = Date.now();
+        setListeningNoSpeech(false);
+        lastSpeechTimestamp.current = Date.now(); // Reset timestamp when starting
         startSilenceDetection();
       };
 
       speechRecognition.current.onend = () => {
-        console.log("Speech recognition ended");
+        console.log("Speech recognition ended, paused state:", isPaused);
         setIsSpeechRecognitionActive(false);
         stopSilenceDetection();
 
-        // Only restart if we're not waiting for AI, not paused, and still want it to be active
+        // Only restart if we're not paused, not waiting for AI, and still want it to be active
+        // Important: Check the current value of isPaused
         if (
           enableMic &&
           !isWaitingForAI &&
           !isPaused &&
-          !isSpeechRecognitionActive
+          !isSpeechRecognitionActive &&
+          isStarted
         ) {
           console.log("Restarting speech recognition...");
           setTimeout(() => {
+            // Double-check state right before restarting
             if (
               speechRecognition.current &&
               !isSpeechRecognitionActive &&
               !isWaitingForAI &&
-              !isPaused
+              !isPaused &&
+              enableMic &&
+              isStarted
             ) {
               try {
+                console.log("Actually restarting speech recognition now");
                 speechRecognition.current.start();
               } catch (error) {
                 console.error("Error restarting speech recognition:", error);
               }
+            } else {
+              console.log(
+                "Conditions changed, not restarting speech recognition"
+              );
             }
           }, 300); // Slightly longer delay to prevent rapid restart errors
+        } else {
+          console.log("Not restarting speech recognition because:", {
+            isPaused,
+            isWaitingForAI,
+            enableMic,
+            isStarted,
+          });
         }
       };
 
@@ -548,10 +734,15 @@ function DiscussionRoom() {
           ]);
 
           // Add the final transcript to the conversation as a user message
-          setConversation((prev) => [
-            ...prev,
-            { role: "user", content: finalResult.text },
-          ]);
+          setConversation((prev) => {
+            const userMessage = { role: "user", content: finalResult.text };
+            const updatedConversation = [...prev, userMessage];
+
+            // Clean up the conversation to prevent nested arrays and duplicates
+            const cleanedConversation =
+              cleanupConversationArray(updatedConversation);
+            return cleanedConversation;
+          });
 
           // Only call AIModel if DiscussionRoomData is available and transcript is not empty
           if (
@@ -591,14 +782,20 @@ function DiscussionRoom() {
               let retryCount = 0;
               const maxRetries = 3;
 
+              // Get last 5 messages for better context, or all if fewer than 5
+              const contextMessages =
+                cleanupConversationArray(conversationHistory);
+              const contextLength = Math.min(5, contextMessages.length);
+              const messagesToSend = contextMessages.slice(-contextLength);
+
+              // Add timestamp to ensure request uniqueness
+              const timestamp = new Date().getTime();
+              console.log(
+                `AI request attempt ${retryCount + 1} at ${timestamp} with ${messagesToSend.length} messages`
+              );
+
               while (!aiResponse && retryCount < maxRetries) {
                 try {
-                  // Add a timestamp to ensure each request is unique
-                  const timestamp = new Date().getTime();
-                  console.log(
-                    `AI request attempt ${retryCount + 1} at ${timestamp}`
-                  );
-
                   // Wrap AI model call in a timeout
                   const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(
@@ -610,7 +807,7 @@ function DiscussionRoom() {
                   const aiModelPromise = AIModel(
                     DiscussionRoomData.topic,
                     DiscussionRoomData.coachingOption,
-                    conversationHistory
+                    messagesToSend
                   );
 
                   // Race the AI model against the timeout
@@ -653,24 +850,32 @@ function DiscussionRoom() {
                   // Check for duplicate responses (exact match)
                   if (lastAIResponses.includes(aiResponse.content)) {
                     console.error(
-                      "Duplicate response detected:",
-                      aiResponse.content
+                      "Duplicate response detected, adding unique identifier"
                     );
-                    throw new Error("Duplicate AI response detected");
+                    // Instead of throwing an error, make the response unique
+                    const uniqueId = Math.random().toString(36).substring(2, 6);
+                    aiResponse.content = aiResponse.content.trim();
+                    // Add the unique ID in a way that doesn't affect the visible content
+                    aiResponse._uniqueId = uniqueId;
+                    // Continue with this response instead of throwing an error
                   }
 
                   // Also check for high similarity with last response
-                  if (lastAIResponses.length > 0) {
+                  else if (lastAIResponses.length > 0) {
                     const lastResponse =
                       lastAIResponses[lastAIResponses.length - 1];
                     if (
                       lastResponse &&
                       isTooSimilar(lastResponse, aiResponse.content)
                     ) {
-                      console.error("Too similar to last response");
-                      throw new Error(
-                        "AI response too similar to previous response"
+                      console.log(
+                        "Response similar to previous, adding variation"
                       );
+                      // Instead of throwing an error, add a disclaimer to the response
+                      const clarification =
+                        "\n\nIs there a specific aspect of this you'd like me to explain differently or in more detail?";
+                      aiResponse.content =
+                        aiResponse.content.trim() + clarification;
                     }
                   }
                 } catch (error) {
@@ -729,14 +934,18 @@ function DiscussionRoom() {
               // Update conversation with AI response
               setConversation((prev) => {
                 const newConversation = [...prev, aiResponse];
+                // Clean up the conversation
+                const cleanedConversation =
+                  cleanupConversationArray(newConversation);
+
                 if (DiscussionRoomData?._id) {
                   // Save to database
                   UpdateConversation({
                     id: DiscussionRoomData._id,
-                    conversation: newConversation,
+                    conversation: cleanedConversation,
                   });
                 }
-                return newConversation;
+                return cleanedConversation;
               });
 
               // Wait a moment before restarting speech recognition
@@ -789,11 +998,23 @@ function DiscussionRoom() {
 
   // Add this helper function to check response similarity
   const isTooSimilar = (str1, str2) => {
+    // Skip comparison if either string is missing or they have very different lengths
+    if (!str1 || !str2) return false;
+    if (Math.abs(str1.length - str2.length) > str1.length * 0.4) return false;
+
     // Simple similarity check - can be improved with more sophisticated algorithms
     const words1 = str1.toLowerCase().split(/\s+/);
     const words2 = str2.toLowerCase().split(/\s+/);
 
-    // If more than 80% of the words are the same, consider it too similar
+    // If lengths are very different, they're not similar
+    if (
+      Math.abs(words1.length - words2.length) >
+      Math.min(words1.length, words2.length) * 0.5
+    ) {
+      return false;
+    }
+
+    // If more than 70% of the words are the same, consider it too similar
     const commonWords = words1.filter((word) => words2.includes(word)).length;
     const similarity = commonWords / Math.max(words1.length, words2.length);
 
@@ -871,19 +1092,20 @@ function DiscussionRoom() {
       setShowPermissionDialog(false);
       setIsPaused(false);
 
+      // Initialize speech recognition but don't start it yet
       const speechInitialized = initializeSpeechRecognition();
       if (!speechInitialized) {
         throw new Error("Speech recognition initialization failed");
       }
 
-      if (speechRecognition.current && !isSpeechRecognitionActive) {
-        speechRecognition.current.start();
-      }
+      // Note: We no longer automatically start speech recognition here
+      // Instead, we'll start it when the user clicks "Start Conversation" or "Resume"
 
       // Wait for RecordRTC to be loaded
       const RecordRTCModule = await import("recordrtc");
       const RecordRTCConstructor = RecordRTCModule.default;
 
+      // Set up recorder but don't start it yet
       recorder.current = new RecordRTCConstructor(stream.current, {
         type: "audio",
         mimeType: "audio/webm;codecs=pcm",
@@ -909,13 +1131,50 @@ function DiscussionRoom() {
         },
       });
 
-      await recorder.current.startRecording();
-      console.log("Recording started successfully");
+      console.log("Recording setup completed successfully");
     } catch (err) {
-      console.error("Error starting recording:", err);
+      console.error("Error setting up recording:", err);
       setEnableMic(false);
-      setPermissionError(err.message || "Failed to start recording");
+      setPermissionError(err.message || "Failed to set up recording");
       setShowPermissionDialog(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const GenerateFeedbackNotes = async () => {
+    setLoading(true);
+    try {
+      // Clean up the conversation before sending it for feedback
+      const cleanedConversation = cleanupConversationArray(conversation);
+      console.log(
+        `Generating feedback with ${cleanedConversation.length} cleaned messages`
+      );
+
+      const feedbackNotes = await AIModelToGenerateFeedbackAndNotes(
+        DiscussionRoomData?.topic,
+        DiscussionRoomData?.coachingOption,
+        cleanedConversation
+      );
+      console.log(feedbackNotes);
+
+      // Set feedback content to display in the dedicated feedback section
+      setFeedbackContent(feedbackNotes.content);
+
+      // Update the feedback in the Convex database
+      if (DiscussionRoomData?._id) {
+        await UpdateSessionFeedback({
+          id: DiscussionRoomData._id,
+          sessionFeedback: feedbackNotes.content,
+        });
+        console.log("Session feedback saved to database successfully");
+      }
+    } catch (error) {
+      console.error("Error generating feedback notes:", error);
+      // Display a user-friendly error message in the feedback section
+      setFeedbackContent(
+        "Sorry, there was an error generating the feedback. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -1037,12 +1296,64 @@ function DiscussionRoom() {
         <div>
           <div className="h-[60vh] bg-secondary border rounded-4xl flex flex-col p-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <h2 className="font-bold mb-4">Chat Section</h2>
-            <ChatBox conversation={conversation} />
+            <ChatBox
+              conversation={conversation}
+              DiscussionRoomData={DiscussionRoomData}
+            />
           </div>
-          <h2 className="mt-3 text-gray-400 text-sm">
-            At the end of your conversation we will automatically generate
-            feedback/notes from your conversation
-          </h2>
+
+          {/* Separate Feedback Notes Section */}
+          <div className="mt-4">
+            {!enableFeedbackNotes ? (
+              <h2 className="text-gray-400 text-sm">
+                At the end of your conversation we will automatically generate
+                feedback/notes from your conversation
+              </h2>
+            ) : (
+              <div>
+                {feedbackContent ? (
+                  <div className="bg-gray-50 p-3 rounded-lg border max-h-[200px] overflow-y-auto">
+                    <h3 className="font-medium text-sm mb-1">
+                      Session Feedback & Notes
+                    </h3>
+                    <div className="text-sm whitespace-pre-line">
+                      {feedbackContent}
+                    </div>
+                  </div>
+                ) : (
+                  // Check if conversation has at least one user and one assistant message
+                  (() => {
+                    const hasUserMessage = conversation.some(
+                      (msg) => msg.role === "user"
+                    );
+                    const hasAssistantMessage = conversation.some(
+                      (msg) => msg.role === "assistant"
+                    );
+                    const hasMinimumConversation =
+                      hasUserMessage && hasAssistantMessage;
+
+                    return hasMinimumConversation ? (
+                      <Button
+                        onClick={GenerateFeedbackNotes}
+                        disabled={loading}
+                        className="w-full"
+                      >
+                        {loading && (
+                          <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Generate Feedback/Notes
+                      </Button>
+                    ) : (
+                      <h2 className="text-gray-400 text-sm">
+                        Have a conversation with the assistant first to enable
+                        feedback generation
+                      </h2>
+                    );
+                  })()
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

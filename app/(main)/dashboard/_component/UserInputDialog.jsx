@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
 import {
@@ -10,34 +10,38 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { CoachingExpert } from '@/services/Options';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import { LoaderCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { CoachingExpert } from "@/services/Options";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useContext } from "react";
+import { UserContext } from "@/app/_context/UserContext";
 
-function UserInputDialog({children, coachingOption}) {
+function UserInputDialog({ children, coachingOption }) {
   const [selectedExpert, setSelectedExpert] = useState();
-  const [topic,setTopic] = useState();
+  const [topic, setTopic] = useState();
   const createDiscussionRoom = useMutation(api.DiscussionRoom.CreateNewRoom);
-  const [loading,setLoading] = useState(false);
-  const [openDialog,setOpenDialog]=useState(false);
+  const [loading, setLoading] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
   const router = useRouter();
+  const { userData } = useContext(UserContext);
 
-  const OnClickNext = async()=>{
+  const OnClickNext = async () => {
     setLoading(true);
     const result = await createDiscussionRoom({
       topic: topic,
       coachingOption: coachingOption?.name,
-      expertName: selectedExpert
-    })
+      expertName: selectedExpert,
+      userId: userData?._id,
+    });
     console.log(result);
     setLoading(false);
     setOpenDialog(false);
-    router.push('/discussion-room/'+result)
-  }
+    router.push("/discussion-room/" + result);
+  };
   return (
     <Dialog open={openDialog} onOpenChange={setOpenDialog}>
       <DialogTrigger>{children}</DialogTrigger>
@@ -83,10 +87,13 @@ function UserInputDialog({children, coachingOption}) {
                   <Button variant="ghost">Cancel</Button>
                 </DialogClose>
 
-                <Button disabled={!topic || !selectedExpert || loading} onClick={OnClickNext}>
-                  {loading && <LoaderCircle className='animate-spin'/>}
+                <Button
+                  disabled={!topic || !selectedExpert || loading}
+                  onClick={OnClickNext}
+                >
+                  {loading && <LoaderCircle className="animate-spin" />}
                   Next
-                  </Button>
+                </Button>
               </div>
             </div>
           </DialogDescription>
@@ -96,4 +103,4 @@ function UserInputDialog({children, coachingOption}) {
   );
 }
 
-export default UserInputDialog
+export default UserInputDialog;
