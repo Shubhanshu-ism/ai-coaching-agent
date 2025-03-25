@@ -2,13 +2,27 @@
 
 An intelligent coaching platform powered by AI that provides personalized learning experiences across multiple domains.
 
-![AI Coaching Dashboard](public/geminiCoachingLogo.svg)
+<div align="center">
+  <img src="public/geminiCoachingLogo.svg" alt="AI Coaching Logo" width="200"/>
+  
+  # AI Coaching Dashboard
+  
+  <img src="public/image.png" alt="AI Coaching Dashboard" width="800"/>
+</div>
 
 ## Overview
 
 AI Coaching is a comprehensive learning platform that leverages artificial intelligence to provide personalized coaching experiences. The platform offers various learning modules designed to help users improve their skills, knowledge, and personal development.
 
 ## Features
+
+<div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+  <img src="public/lecture.png" alt="Topic Lecture" width="150"/>
+  <img src="public/interview.png" alt="Mock Interview" width="150"/>
+  <img src="public/qa.png" alt="Q&A Practice" width="150"/>
+  <img src="public/language.png" alt="Language Learning" width="150"/>
+  <img src="public/meditation.png" alt="Meditation Guide" width="150"/>
+</div>
 
 ### 1. Topic Lecture
 
